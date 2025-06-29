@@ -1,153 +1,125 @@
 using UnityEngine;
-using UnityEngine.UI; // Pastikan ini ada untuk Slider
+using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using System.Collections;
-using TMPro; // Tambahkan ini untuk menggunakan Text Mesh Pro
+using TMPro;
 
+/// <summary>
+/// Mengelola proses loading scene secara asynchronous dengan menampilkan progress
+/// pada sebuah Slider dan teks persentase menggunakan TextMeshPro.
+/// </summary>
 public class LoadingManager : MonoBehaviour
 {
-    // Ubah dari Image menjadi Slider
-    public Slider loadingSlider; 
-    // Tambahkan referensi untuk Text Mesh Pro
-    public TMP_Text loadingPercentageText; 
+    [Header("UI Elements")]
+    [Tooltip("Slider untuk menampilkan progress loading.")]
+    public Slider loadingSlider;
 
-    public string sceneToLoad = "GameScene"; 
+    [Tooltip("Teks untuk menampilkan persentase loading (TMP_Text).")]
+    public TMP_Text loadingPercentageText;
 
-    // Opsional: Waktu penundaan setelah loading 100% sebelum scene aktif
-    public float activationDelay = 1.0f; // Contoh: 1 detik
+    [Header("Scene Settings")]
+    [Tooltip("Nama scene yang akan dimuat. Pastikan nama ini sesuai dan scene telah ditambahkan ke Build Settings.")]
+    public string sceneToLoad;
 
-    // Kecepatan interpolasi untuk membuat gerakan bilah lebih halus
-    // Sesuaikan nilai ini di Inspector untuk efek yang diinginkan (misal: 5f, 10f)
-    public float lerpSpeed = 5f; 
+    [Header("Loading Behavior")]
+    [Tooltip("Kecepatan interpolasi untuk memperhalus gerakan progress bar.")]
+    [Range(1f, 20f)]
+    public float lerpSpeed = 10f;
+
+    [Tooltip("Waktu tunda (detik) setelah loading mencapai 100% sebelum scene aktif.")]
+    public float activationDelay = 0.5f;
 
     void Start()
     {
-        // Pastikan slider dan teks disembunyikan di awal jika belum diatur
-        if (loadingSlider != null)
+        // Validasi awal untuk memastikan semua referensi telah diatur di Inspector.
+        // Ini adalah langkah PENTING untuk menghindari NullReferenceException.
+        if (loadingSlider == null)
         {
-            loadingSlider.gameObject.SetActive(false);
-        }
-        if (loadingPercentageText != null)
-        {
-            loadingPercentageText.gameObject.SetActive(false);
-        }
-        
-        Debug.Log("LoadingManager: Starting load process."); // Debugging
-        
-        // Aktifkan slider dan teks, serta atur nilainya ke 0 saat memulai
-        if (loadingSlider != null)
-        {
-            loadingSlider.gameObject.SetActive(true);
-            loadingSlider.value = 0f; // PASTIKAN DIMULAI DARI 0
-            Debug.Log("LoadingManager: loadingSlider activated and set to 0 value."); // Debugging
-        }
-        else
-        {
-            Debug.LogError("LoadingManager: loadingSlider is NOT assigned in the Inspector!"); // Debugging
+            Debug.LogError("ERROR: Loading Slider belum di-assign di Inspector!");
+            this.enabled = false; // Nonaktifkan script ini jika setup tidak valid.
+            return;
         }
 
-        if (loadingPercentageText != null)
+        if (loadingPercentageText == null)
         {
-            loadingPercentageText.gameObject.SetActive(true);
-            loadingPercentageText.text = "0%"; // Atur teks awal
-        }
-        else
-        {
-            Debug.LogError("LoadingManager: loadingPercentageText is NOT assigned in the Inspector!"); // Debugging
+            Debug.LogError("ERROR: Loading Percentage Text belum di-assign di Inspector!");
+            this.enabled = false; // Nonaktifkan script ini jika setup tidak valid.
+            return;
         }
 
+        if (string.IsNullOrEmpty(sceneToLoad))
+        {
+            Debug.LogError("ERROR: Nama Scene To Load belum diisi di Inspector!");
+            this.enabled = false; // Nonaktifkan script ini jika setup tidak valid.
+            return;
+        }
+
+        // Memulai proses loading
         StartCoroutine(LoadSceneAsync());
     }
 
-    IEnumerator LoadSceneAsync()
+    /// <summary>
+    /// Coroutine untuk memuat scene secara asynchronous dan memperbarui UI.
+    /// </summary>
+    private IEnumerator LoadSceneAsync()
     {
-        // Memulai operasi pemuatan scene secara asynchronous
-        AsyncOperation operation = SceneManager.LoadSceneAsync(sceneToLoad);
-        operation.allowSceneActivation = false; // Mencegah scene aktif secara otomatis setelah dimuat
+        // Inisialisasi UI
+        loadingSlider.value = 0f;
+        loadingPercentageText.text = "0%";
 
-        // Handle jika scene tidak ditemukan
+        // Memulai operasi pemuatan scene
+        AsyncOperation operation = SceneManager.LoadSceneAsync(sceneToLoad);
+
+        // Menangani jika scene tidak dapat ditemukan di Build Settings
         if (operation == null)
         {
-            Debug.LogError("LoadingManager: Scene '" + sceneToLoad + "' could not be loaded. Check Build Settings and scene name."); // Debugging
-            yield break; // Keluar dari coroutine jika scene tidak ditemukan
+            Debug.LogError($"ERROR: Scene '{sceneToLoad}' tidak dapat dimuat. Periksa nama scene dan pastikan sudah ditambahkan ke Build Settings (File -> Build Settings).");
+            yield break; // Hentikan coroutine
         }
 
-        // Variabel untuk melacak apakah scene siap diaktifkan dan penundaan telah dimulai
-        bool readyToActivate = false;
+        // Mencegah scene aktif secara otomatis setelah selesai dimuat
+        operation.allowSceneActivation = false;
 
-        // Loop selama scene belum sepenuhnya dimuat dan diaktifkan (operation.isDone akan menjadi true setelah allowSceneActivation = true)
-        while (!operation.isDone)
+        float currentProgress = 0f;
+
+        // Loop berjalan selama proses loading (operation.progress berhenti di 0.9)
+        while (operation.progress < 0.9f)
         {
-            // Menghitung target progres untuk slider
-            // operation.progress berjalan dari 0 hingga 0.9 saat scene dimuat.
-            // Kita membaginya dengan 0.9 untuk menskalakannya ke 0-1 untuk bilah loading.
+            // Menghitung progress target (0 sampai 1)
             float targetProgress = Mathf.Clamp01(operation.progress / 0.9f);
 
-            if (loadingSlider != null)
-            {
-                // Lakukan interpolasi linear pada nilai slider
-                loadingSlider.value = Mathf.Lerp(loadingSlider.value, targetProgress, lerpSpeed * Time.deltaTime);
-            }
-            else
-            {
-                Debug.LogError("LoadingManager: loadingSlider became null during update!"); // Debugging
-            }
+            // Interpolasi nilai progress untuk gerakan yang lebih halus
+            currentProgress = Mathf.Lerp(currentProgress, targetProgress, lerpSpeed * Time.deltaTime);
+            
+            loadingSlider.value = currentProgress;
+            loadingPercentageText.text = Mathf.RoundToInt(currentProgress * 100f) + "%";
 
-            // Perbarui teks persentase
-            if (loadingPercentageText != null)
-            {
-                // Hitung persentase dari nilai slider yang sudah diinterpolasi
-                int percentage = Mathf.RoundToInt(loadingSlider.value * 100f);
-                loadingPercentageText.text = percentage + "%";
-            }
-
-            // Ketika scene hampir dimuat (progres mencapai 0.9)
-            if (operation.progress >= 0.9f)
-            {
-                // Pastikan nilai slider visual mencapai 100%
-                if (loadingSlider != null)
-                {
-                    loadingSlider.value = Mathf.Lerp(loadingSlider.value, 1f, lerpSpeed * Time.deltaTime);
-                }
-
-                // Perbarui teks persentase menjadi 100% saat slider mencapai penuh
-                if (loadingPercentageText != null)
-                {
-                    loadingPercentageText.text = Mathf.RoundToInt(loadingSlider.value * 100f) + "%"; // Pastikan 100% ditampilkan
-                }
-
-                // Jika nilai slider sudah mendekati 100% secara visual (misal >= 99%)
-                // dan kita belum memulai penundaan aktivasi
-                if (loadingSlider != null && loadingSlider.value >= 0.99f && !readyToActivate)
-                {
-                    readyToActivate = true; // Tandai bahwa kita siap untuk mengaktifkan scene
-                    Debug.Log("LoadingManager: Scene almost loaded, waiting for activation delay..."); // Debugging
-                    yield return new WaitForSeconds(activationDelay); // TUNGGU DISINI SEBELUM AKTIVASI
-
-                    operation.allowSceneActivation = true; // Aktifkan scene baru
-                    Debug.Log("LoadingManager: Scene Activated!"); // Debugging
-                    // Coroutine akan secara alami berakhir ketika operation.isDone menjadi true
-                    // setelah scene baru diizinkan untuk aktif.
-                }
-            }
-
-            yield return null; // Tunggu satu frame sebelum melanjutkan loop
+            yield return null; // Tunggu frame berikutnya
         }
 
-        // Ini adalah fallback jika loop somehow berakhir sebelum scene diaktifkan sepenuhnya.
-        // Ini memastikan slider 100% dan scene diaktifkan.
-        if (!operation.allowSceneActivation)
+        // ---- Proses Loading Selesai (Mencapai 90%) ----
+
+        // Animasikan sisa progress ke 100% secara visual
+        float finalProgressTarget = 1f;
+        while (currentProgress < finalProgressTarget - 0.01f) // Loop sampai sangat dekat dengan 100%
         {
-            if (loadingSlider != null)
-            {
-                loadingSlider.value = 1f;
-            }
-            if (loadingPercentageText != null)
-            {
-                loadingPercentageText.text = "100%"; // Pastikan teks juga 100%
-            }
-            operation.allowSceneActivation = true;
-            Debug.Log("LoadingManager: Scene activated via final fallback."); // Debugging
+            currentProgress = Mathf.Lerp(currentProgress, finalProgressTarget, lerpSpeed * Time.deltaTime);
+            loadingSlider.value = currentProgress;
+            loadingPercentageText.text = Mathf.RoundToInt(currentProgress * 100f) + "%";
+            yield return null;
         }
+
+        // Pastikan UI menunjukkan 100%
+        loadingSlider.value = 1f;
+        loadingPercentageText.text = "100%";
+        
+        Debug.Log("Loading Selesai. Menunggu aktivasi scene...");
+
+        // Tunggu sejenak sesuai delay yang ditentukan
+        yield return new WaitForSeconds(activationDelay);
+
+        // Aktifkan scene yang sudah dimuat
+        Debug.Log("Mengaktifkan Scene!");
+        operation.allowSceneActivation = true;
     }
 }

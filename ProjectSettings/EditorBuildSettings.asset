@@ -5,16 +5,22 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
-    path: Assets/Scenes/Main Menu.unity
-    guid: 8f5a5744983282b459338a6d6615e090
-  - enabled: 1
-    path: Assets/Scenes/Level_Dua.unity
-    guid: ce6e9167833e6d545969d8a521a4b0b0
   - enabled: 0
     path: Assets/Scenes/SampleScene.unity
     guid: 2cda990e2423bbf4892e6590ba056729
   - enabled: 1
-    path: Assets/Scenes/unity 1.unity
+    path: Assets/Scenes/Tampilan_Pertama.unity
+    guid: 578eac1ad62b7cf42ab7c399cd4a869b
+  - enabled: 1
+    path: Assets/Scenes/Main Menu.unity
+    guid: 395626f022fdd104d9a255e321e117d0
+  - enabled: 1
+    path: Assets/Scenes/Pilih_Level.unity
+    guid: 6f1171fa032da9347bf45c166852123e
+  - enabled: 1
+    path: Assets/Scenes/Level_Satu.unity
     guid: 4e9d32ff817d2bb4095886b90172db58
+  - enabled: 1
+    path: Assets/Scenes/Level_Dua.unity
+    guid: ce6e9167833e6d545969d8a521a4b0b0
   m_configObjects: {}
